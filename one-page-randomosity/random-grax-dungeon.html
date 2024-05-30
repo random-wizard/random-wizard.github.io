@@ -1,0 +1,1162 @@
+<html>
+<head>
+<title>Random Grax Dungeon</title>
+<meta charset="utf8">
+<script>
+var wiz = {};
+/*
+  generator
+    generate_blank_map
+    setup_start_south
+    build_room    <-----------------------------------------------
+      gygax_table_V (room dimension)                              \
+      find_square_start_end_point                                 |
+      check_fit_for_square_room                                   |
+      set_square_data_for_square_room_by_start_end_corner         |
+      open_passageway_back_through_cursor_current                 |
+      generate_exits_for_room                                     |
+        gygax_table_V_C (number of exits based on dimension)      |
+        set_exits_for_square_room                                 |
+          gygax_table_V_D (exit location based on facing)         |
+          determine_wall                                          |
+          check_fit_for_cursor                                    /
+            -----------------------------------------------------
+
+    draw_table
+*/
+wiz.random_dungeon = {};
+wiz.random_dungeon.room_number = 0;
+wiz.random_dungeon.CONFIG_MAX_WIDTH = 32;
+wiz.random_dungeon.CONFIG_MAX_HEIGHT = 32;
+wiz.random_dungeon.CONFIG_HALL_FREQUENCY = 0;
+wiz.random_dungeon.CONFIG_BUILD_TRY = 6;
+wiz.random_dungeon.CONFIG_BREAKTHRU_FREQUENCY = 0;
+
+wiz.random_dungeon.generator = function()
+{
+  var master_map = [];
+  //randomize hall frequency
+  wiz.random_dungeon.CONFIG_HALL_FREQUENCY = wiz.random_dungeon.get_random(1, 100);
+  //randomize build retry
+  wiz.random_dungeon.CONFIG_BUILD_TRY = wiz.random_dungeon.get_random(1, 6);
+  //randomize exit back to existing room frequency
+  wiz.random_dungeon.CONFIG_BREAKTHRU_FREQUENCY = wiz.random_dungeon.get_random(1, 50);
+  master_map = wiz.random_dungeon.generate_blank_map();
+  var x_center = Math.floor(wiz.random_dungeon.CONFIG_MAX_WIDTH / 2);
+  var y_center = Math.floor(wiz.random_dungeon.CONFIG_MAX_HEIGHT / 2);
+  var x_start = x_center + wiz.random_dungeon.get_random(0, 2);
+  var y_start = y_center + wiz.random_dungeon.get_random(0, 2);
+  var direction = wiz.random_dungeon.get_random(1, 4);
+  var x = x_start;
+  var y = y_start;
+  if(direction == 1)
+  {
+    master_map = wiz.random_dungeon.setup_start_south(x, y, master_map);
+  }
+  else if(direction == 2)
+  {
+    master_map = wiz.random_dungeon.setup_start_west(x, y, master_map);
+  }
+  else if(direction == 3)
+  {
+    master_map = wiz.random_dungeon.setup_start_north(x, y, master_map);
+  }
+  else if(direction == 4)
+  {
+    master_map = wiz.random_dungeon.setup_start_east(x, y, master_map);
+  }
+  wiz.random_dungeon.draw_table(master_map);
+  //wiz.random_dungeon.to_json_div(master_map);
+};
+
+wiz.random_dungeon.generate_blank_map = function()
+{
+  var master_map = [];
+  var x = 0;
+  var y = 0;
+  var map_column = [];
+  var square_definition = {
+    'wall_stack' : {
+      'top' : 0,
+      'left' : 0,
+      'right' : 0,
+      'bottom' : 0,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 0
+    },
+    'label' : 0
+  };
+  for(x = 1; x <= wiz.random_dungeon.CONFIG_MAX_WIDTH; x++)
+  {
+    map_column = [];
+    for(y = 1; y <= wiz.random_dungeon.CONFIG_MAX_HEIGHT; y++)
+    {
+      map_column[y] = square_definition;
+    }
+    master_map[x] = map_column;
+  }
+  return master_map;
+};
+
+wiz.random_dungeon.setup_start_south = function(x, y, master_map)
+{
+  var cursor_current = {
+    'x' : 0,
+    'y' : 0,
+    'backward' : '',
+    'facing' : '',
+    'type' : ''
+  };
+  var square_definition = {
+    'wall_stack' : {
+      'top' : 1,
+      'left' : 1,
+      'right' : 1,
+      'bottom' : 0,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : '0'
+  };
+  master_map[x][y] = square_definition;
+  //move south 1 square
+  y = y - 1;
+  square_definition = {
+    'wall_stack' : {
+      'top' : 0,
+      'left' : 1,
+      'right' : 1,
+      'bottom' : 0,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : ''
+  };
+  master_map[x][y] = square_definition;
+  //move south 1 squre
+  y = y - 1;
+  cursor_current.x = x;
+  cursor_current.y = y;
+  cursor_current.backward = 'north';
+  cursor_current.facing = 'south';
+  cursor_current.type = 'room';
+  master_map = wiz.random_dungeon.build_room(cursor_current, master_map);
+  return master_map;
+};
+
+wiz.random_dungeon.setup_start_east = function(x, y, master_map)
+{
+  var cursor_current = {
+    'x' : 0,
+    'y' : 0,
+    'backward' : '',
+    'facing' : '',
+    'type' : ''
+  };
+  var square_definition = {
+    'wall_stack' : {
+      'top' : 1,
+      'left' : 1,
+      'right' : 0,
+      'bottom' : 1,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : '0'
+  };
+  master_map[x][y] = square_definition;
+  //move east 1 square
+  x = x + 1;
+  square_definition = {
+    'wall_stack' : {
+      'top' : 1,
+      'left' : 0,
+      'right' : 0,
+      'bottom' : 1,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : ''
+  };
+  master_map[x][y] = square_definition;
+  //move east 1 squre
+  x = x + 1;
+  cursor_current.x = x;
+  cursor_current.y = y;
+  cursor_current.backward = 'west';
+  cursor_current.facing = 'east';
+  cursor_current.type = 'room';
+  master_map = wiz.random_dungeon.build_room(cursor_current, master_map);
+  return master_map;
+};
+
+wiz.random_dungeon.setup_start_north = function(x, y, master_map)
+{
+  var cursor_current = {};
+  var square_definition = {
+    'wall_stack' : {
+      'top' : 0,
+      'left' : 1,
+      'right' : 1,
+      'bottom' : 1,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : '0'
+  };
+  master_map[x][y] = square_definition;
+  //move north 1 square
+  y = y + 1;
+  square_definition = {
+    'wall_stack' : {
+      'top' : 0,
+      'left' : 1,
+      'right' : 1,
+      'bottom' : 0,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : ''
+  };
+  master_map[x][y] = square_definition;
+  //move north 1 squre
+  y = y + 1;
+  cursor_current.x = x;
+  cursor_current.y = y;
+  cursor_current.backward = 'south';
+  cursor_current.facing = 'north';
+  cursor_current.type = 'room';
+  master_map = wiz.random_dungeon.build_room(cursor_current, master_map);
+  return master_map;
+};
+
+wiz.random_dungeon.setup_start_west = function(x, y, master_map)
+{
+  var cursor_current = {};
+  var square_definition = {
+    'wall_stack' : {
+      'top' : 1,
+      'left' : 0,
+      'right' : 1,
+      'bottom' : 1,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : '0'
+  };
+  master_map[x][y] = square_definition;
+  //move west 1 square
+  x = x - 1;
+  square_definition = {
+    'wall_stack' : {
+      'top' : 1,
+      'left' : 0,
+      'right' : 0,
+      'bottom' : 1,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 1
+    },
+    'label' : ''
+  };
+  master_map[x][y] = square_definition;
+  //move west 1 square
+  x = x - 1;
+  cursor_current.x = x;
+  cursor_current.y = y;
+  cursor_current.backward = 'east';
+  cursor_current.facing = 'west';
+  cursor_current.type = 'room';
+  master_map = wiz.random_dungeon.build_room(cursor_current, master_map);
+  return master_map;
+};
+
+/*
+  Try to build a room based of gygax_table_V.
+  Fill out squares in the master_map
+  @cursor_current - one record in the unfinished_way queue
+  @return - false if failed ot make a room
+*/
+wiz.random_dungeon.build_room = function(cursor_current, master_map)
+{
+  var dimension = {};
+  var start_end_corner = {};
+  var x = 0;
+  //uncomment this to get each iteration of the maze
+  //wiz.random_dungeon.draw_table(master_map);
+  if(typeof cursor_current == 'undefined')
+  {
+    return master_map;
+  }
+  //trying more times fills in more empty space with rooms
+  for(x = 1; x <= wiz.random_dungeon.CONFIG_BUILD_TRY; x++)
+  {
+    if(wiz.random_dungeon.get_random(1, 100) < wiz.random_dungeon.CONFIG_HALL_FREQUENCY)
+    {
+      dimension = wiz.random_dungeon.wiz_table_V();
+    }
+    else
+    {
+      dimension = wiz.random_dungeon.gygax_table_V();
+    }
+    start_end_corner = wiz.random_dungeon.find_square_start_end_point(cursor_current, dimension, cursor_current.backward);
+    if(wiz.random_dungeon.check_fit_for_square_room(start_end_corner, master_map))
+    {
+      break;
+    }
+  }
+  if(wiz.random_dungeon.check_fit_for_square_room(start_end_corner, master_map))
+  {
+    master_map = wiz.random_dungeon.set_square_data_for_square_room_by_start_end_corner(start_end_corner, master_map);
+    master_map = wiz.random_dungeon.open_passageway_back_through_cursor_current(cursor_current, master_map);
+    master_map = wiz.random_dungeon.generate_exits_for_room(cursor_current, start_end_corner, dimension, master_map);
+
+  }
+  return master_map;
+};
+
+/*
+  Sets walls and empties squares based on a box.
+  Make sure check_fit_for_square_room is done before this is called.
+*/
+wiz.random_dungeon.set_square_data_for_square_room_by_start_end_corner = function(start_end_corner, master_map)
+{
+  var square_definition = {
+    'wall_stack' : {
+      'top' : 0,
+      'left' : 0,
+      'right' : 0,
+      'bottom' : 0,
+      'slash' : 0,
+      'backslash' : 0
+    },
+    'clear_stack' : {
+      'all' : 0
+    },
+    'label' : ''
+  };
+  var x_start = start_end_corner.start_corner.x;
+  var y_start = start_end_corner.start_corner.y;
+  var x_end = start_end_corner.end_corner.x;
+  var y_end = start_end_corner.end_corner.y;
+  var x = 0;
+  var y = 0;
+
+  for(x = x_start; x <= x_end; x++)
+  {
+    for(y = y_start; y <= y_end; y++)
+    {
+      square_definition = {
+        'wall_stack' : {
+          'top' : 0,
+          'left' : 0,
+          'right' : 0,
+          'bottom' : 0,
+          'slash' : 0,
+          'backslash' : 0
+        },
+        'clear_stack' : {
+          'all' : 0
+        },
+        'label' : ''
+      };
+      if((x == x_start) && (y == y_start))
+      {
+        wiz.random_dungeon.room_number++;
+        square_definition.label = wiz.random_dungeon.room_number;
+      }
+      else
+      {
+        //square_definition.label = x+'-'+y;
+        square_definition.label = '';
+      }
+      square_definition.wall_stack.top = 0;
+      square_definition.wall_stack.left = 0;
+      square_definition.wall_stack.right = 0;
+      square_definition.wall_stack.bottom = 0;
+      square_definition.wall_stack.slash = 0;
+      square_definition.wall_stack.backslash = 0;
+      square_definition.clear_stack.all = 1;
+      if(x == x_start)
+      {
+        square_definition.wall_stack.left = 1;
+      }
+      if(x == x_end)
+      {
+        square_definition.wall_stack.right = 1;
+      }
+      if(y == y_start)
+      {
+        square_definition.wall_stack.bottom = 1;
+      }
+      if(y == y_end)
+      {
+        square_definition.wall_stack.top = 1;
+      }
+      master_map[x][y] = square_definition;
+    }
+  }
+  return master_map;
+};
+
+wiz.random_dungeon.generate_exits_for_room = function(cursor_current, start_end_corner, dimension, master_map)
+{
+  var number_of_exits = wiz.random_dungeon.gygax_table_V_C(dimension.room_area);
+  var x = 0;
+  for(x - 0; x < number_of_exits; x++)
+  {
+    master_map = wiz.random_dungeon.set_exits_for_square_room(cursor_current, start_end_corner, master_map);
+  }
+  return master_map;
+};
+
+wiz.random_dungeon.set_exits_for_square_room = function(cursor_current, start_end_corner, master_map)
+{
+  var cursor_new = {
+    'x' : 0,
+    'y' : 0,
+    'facing' : ''
+  };
+  var exit_direction = '';
+  var exit_x = 0;
+  var exit_y = 0;
+  var wall = '';
+  var x = 0;
+  for(x = 1; x <= wiz.random_dungeon.CONFIG_BUILD_TRY; x++)
+  {
+    exit_direction = wiz.random_dungeon.gygax_table_V_D();
+    wall = wiz.random_dungeon.determine_wall(cursor_current, exit_direction);
+
+    if(wall == 'north')
+    {
+      exit_x = wiz.random_dungeon.get_random(start_end_corner.start_corner.x, start_end_corner.end_corner.x);
+      exit_y = start_end_corner.end_corner.y + 1;
+      cursor_new.x = exit_x;
+      cursor_new.y = exit_y;
+      cursor_new.facing = wall;
+      cursor_new.backward = 'south';
+    }
+    else if(wall == 'east')
+    {
+      exit_x = start_end_corner.end_corner.x + 1;
+      exit_y = wiz.random_dungeon.get_random(start_end_corner.start_corner.y, start_end_corner.end_corner.y);
+      cursor_new.x = exit_x;
+      cursor_new.y = exit_y;
+      cursor_new.facing = wall;
+      cursor_new.backward = 'west';
+    }
+    else if(wall == 'south')
+    {
+      exit_x = wiz.random_dungeon.get_random(start_end_corner.start_corner.x, start_end_corner.end_corner.x);
+      exit_y = start_end_corner.start_corner.y - 1;
+      cursor_new.x = exit_x;
+      cursor_new.y = exit_y;
+      cursor_new.facing = wall;
+      cursor_new.backward = 'north';
+    }
+    else if(wall == 'west')
+    {
+      exit_x = start_end_corner.start_corner.x - 1;
+      exit_y = wiz.random_dungeon.get_random(start_end_corner.start_corner.y, start_end_corner.end_corner.y);
+      cursor_new.x = exit_x;
+      cursor_new.y = exit_y;
+      cursor_new.facing = wall;
+      cursor_new.backward = 'east';
+    }
+
+    /*
+      We found a good exit that is free space.
+      But should we build a door here to the already existing room or hall
+      or whatever? In Gygax tables, the way would be a door of some sort.
+    */
+    if(wiz.random_dungeon.check_fit_for_cursor(cursor_new, master_map) == true)
+    {
+      break;
+    }
+    else if(wiz.random_dungeon.check_existing_space_for_cursor(cursor_new, master_map) == true)
+    {
+      if(wiz.random_dungeon.get_random(1, 100) < wiz.random_dungeon.CONFIG_BREAKTHRU_FREQUENCY)
+      {
+        master_map = wiz.random_dungeon.open_passageway_back_through_cursor_current(cursor_new, master_map);
+      }
+    }
+  }
+  if(wiz.random_dungeon.check_fit_for_cursor(cursor_new, master_map) == true)
+  {
+    cursor_new.type = 'hall';
+    cursor_new.build_off_room = 'rn';
+    master_map = wiz.random_dungeon.build_room(cursor_new, master_map);
+  }
+  return master_map;
+};
+
+/*
+  TODO: All of this could be replaced with math and a rotation.
+*/
+wiz.random_dungeon.determine_wall = function(cursor_current, exit_direction)
+{
+  var wall = '';
+  if(      (cursor_current.facing == 'north') && (exit_direction == 'opposite') )
+  {
+    wall = 'north';
+  }
+  else if( (cursor_current.facing == 'north') && (exit_direction == 'left') )
+  {
+    wall = 'west';
+  }
+  else if( (cursor_current.facing == 'north') && (exit_direction == 'right') )
+  {
+    wall = 'east';
+  }
+  else if( (cursor_current.facing == 'north') && (exit_direction == 'same') )
+  {
+    wall = 'south';
+  }
+
+  if(      (cursor_current.facing == 'east') && (exit_direction == 'opposite') )
+  {
+    wall = 'east';
+  }
+  else if( (cursor_current.facing == 'east') && (exit_direction == 'left') )
+  {
+    wall = 'north';
+  }
+  else if( (cursor_current.facing == 'east') && (exit_direction == 'right') )
+  {
+    wall = 'south';
+  }
+  else if( (cursor_current.facing == 'east') && (exit_direction == 'same') )
+  {
+    wall = 'west';
+  }
+
+  if(      (cursor_current.facing == 'south') && (exit_direction == 'opposite') )
+  {
+    wall = 'south';
+  }
+  else if( (cursor_current.facing == 'south') && (exit_direction == 'left') )
+  {
+    wall = 'east';
+  }
+  else if( (cursor_current.facing == 'south') && (exit_direction == 'right') )
+  {
+    wall = 'west';
+  }
+  else if( (cursor_current.facing == 'south') && (exit_direction == 'same') )
+  {
+    wall = 'north';
+  }
+
+  if(      (cursor_current.facing == 'west') && (exit_direction == 'opposite') )
+  {
+    wall = 'west';
+  }
+  else if( (cursor_current.facing == 'west') && (exit_direction == 'left') )
+  {
+    wall = 'south';
+  }
+  else if( (cursor_current.facing == 'west') && (exit_direction == 'right') )
+  {
+    wall = 'north';
+  }
+  else if( (cursor_current.facing == 'west') && (exit_direction == 'same') )
+  {
+    wall = 'east';
+  }
+  return wall;
+};
+
+/*
+  This is just a check for a value in the master map. Overkill.
+  But it is useful to more explicitly explain what the check is about.
+  This is to make sure the cursor is not out of bounds or already on
+  an existing room.
+*/
+wiz.random_dungeon.check_fit_for_cursor = function(cursor, master_map)
+{
+  /*
+    cursor = {
+      'build_off_room' : 0,
+      'facing' : '',
+      'type' : '',
+      'x' : 0,
+      'y' : 18
+    };
+  */
+  if( (cursor.x < 1) || (cursor.x > wiz.random_dungeon.CONFIG_MAX_WIDTH) )
+  {
+    return false;
+  }
+  else if( (cursor.y < 1) || (cursor.y > wiz.random_dungeon.CONFIG_MAX_HEIGHT) )
+  {
+    return false;
+  }
+  else if(master_map[cursor.x][cursor.y].clear_stack.all == 1)
+  {
+    return false;
+  }
+  return true;
+};
+
+wiz.random_dungeon.check_fit_for_square_room = function(start_end_corner, master_map)
+{
+  /*
+    var start_end_corner = {
+      'start_corner' : {
+        'x' : 0,
+        'y' : 1
+      },
+      'end_corner' : {
+        'x' : 0,
+        'y' : 1
+      }
+    };
+  */
+  var x_start = start_end_corner.start_corner.x;
+  var y_start = start_end_corner.start_corner.y;
+  var x_end = start_end_corner.end_corner.x;
+  var y_end = start_end_corner.end_corner.y;
+  var x = 0;
+  var y = 0;
+  for(x = x_start; x <= x_end; x++)
+  {
+    for(y = y_start; y <= y_end; y++)
+    {
+      if( (x < 1) || (x > wiz.random_dungeon.CONFIG_MAX_WIDTH) )
+      {
+        return false;
+      }
+      else if( (y < 1) || (y > wiz.random_dungeon.CONFIG_MAX_HEIGHT) )
+      {
+        return false;
+      }
+      else if(master_map[x][y].clear_stack.all == 1)
+      {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+wiz.random_dungeon.to_json_div = function(obj)
+{
+  var text = JSON.stringify(obj, null, 2);
+  var elem = document.createElement('div');
+  elem.style.cssText = 'position: absolute; width: 100%; height: 100%; opacity: 0.3; z-index: 100; background: #0000000; white-space: pre;';
+  elem.innerHTML = text;
+  document.body.appendChild(elem);
+};
+
+wiz.random_dungeon.get_random = function(min, max)
+{
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  var result = Math.floor(Math.random() * (max - min + 1)) + min;
+  return result;
+};
+
+wiz.random_dungeon.gygax_table_V = function()
+{
+  var dice = wiz.random_dungeon.get_random(1, 17);
+  var dimension = {
+    'width' : 0,
+    'length' : 0,
+    'room_area' : 0
+  };
+  if( (dice >= 1) && (dice <= 2) )
+  {
+    // 10' x 10'
+    dimension.width = 1;
+    dimension.length = 1;
+  }
+  if( (dice >= 3) && (dice <= 4) )
+  {
+    // 20' x 20'
+    dimension.width = 2;
+    dimension.length = 2;
+  }
+  if( (dice >= 5) && (dice <= 6) )
+  {
+    // 30' x 30'
+    dimension.width = 3;
+    dimension.length = 3;
+  }
+  if( (dice >= 7) && (dice <= 8) )
+  {
+    // 40' x 40'
+    dimension.width = 4;
+    dimension.length = 4;
+  }
+  if( (dice >= 9) && (dice <= 10) )
+  {
+    // 10' x 20'
+    dimension.width = 1;
+    dimension.length = 2;
+  }
+  if( (dice >= 11) && (dice <= 13) )
+  {
+    // 20' x 30'
+    dimension.width = 2;
+    dimension.length = 3;
+  }
+  if( (dice >= 14) && (dice <= 15) )
+  {
+    // 20' x 40'
+    dimension.width = 2;
+    dimension.length = 4;
+  }
+  if( (dice >= 16) && (dice <= 17) )
+  {
+    // 30' x 40'
+    dimension.width = 3;
+    dimension.length = 4;
+  }
+  if( (dice >= 18) && (dice <= 20) )
+  {
+    // unusual shape
+    //TODO add in unusual shape
+  }
+  dimension.room_area = dimension.width * dimension.length * 100;
+  return dimension;
+};
+
+wiz.random_dungeon.wiz_table_V = function()
+{
+  var dice = wiz.random_dungeon.get_random(1, 10);
+  var dimension = {
+    'width' : 0,
+    'length' : 0,
+    'room_area' : 0
+  };
+  if( (dice >= 1) && (dice <= 2) )
+  {
+    dimension.width = 1;
+    dimension.length = 3;
+  }
+  if( (dice >= 3) && (dice <= 4) )
+  {
+    dimension.width = 1;
+    dimension.length = 3;
+  }
+  if( (dice >= 5) && (dice <= 6) )
+  {
+    dimension.width = 1;
+    dimension.length = 4;
+  }
+  if( (dice >= 7) && (dice <= 8) )
+  {
+    dimension.width = 1;
+    dimension.length = 4;
+  }
+  if( (dice >= 9) && (dice <= 10) )
+  {
+    dimension.width = 1;
+    dimension.length = 5;
+  }
+  dimension.room_area = dimension.width * dimension.length * 100;
+  return dimension;
+};
+
+wiz.random_dungeon.find_square_start_end_point = function(start_square, dimension, facing)
+{
+  dimension.width--;
+  dimension.length--;
+  if(dimension.width < 0)
+  {
+    dimension.width = 0;
+  }
+  if(dimension.length < 0)
+  {
+    dimension.length = 0;
+  }
+  var start_offset = wiz.random_dungeon.get_random(0, dimension.width);
+  var start_corner = {
+    'x' : 0,
+    'y' : 0
+  };
+  var end_corner = {
+    'x' : 0,
+    'y' : 0
+  };
+  var start_end_corner = {
+    'start_corner' : start_corner,
+    'end_corner' : end_corner
+  };
+  /*
+    length and width get rotated depending on facing
+    sometimes it is adjusting x and sometimes it is adjusting y
+    to try and make things easier to mentally visualize we try to
+    determine the top left corner and go from there
+  */
+
+  if      (facing == 'north')
+  {
+    start_corner.x = start_square.x - start_offset;
+    start_corner.y = start_square.y - dimension.length;
+    end_corner.x = start_corner.x + dimension.width;
+    end_corner.y = start_corner.y + dimension.length;
+  }
+  else if(facing == 'west')
+  {
+    start_corner.x = start_square.x;
+    start_corner.y = start_square.y - start_offset;
+    end_corner.x = start_corner.x + dimension.length;
+    end_corner.y = start_corner.y + dimension.width;
+  }
+  else if(facing == 'south')
+  {
+    start_corner.x = start_square.x - start_offset;
+    start_corner.y = start_square.y;
+    end_corner.x = start_corner.x + dimension.width;
+    end_corner.y = start_corner.y + dimension.length;
+  }
+  else if(facing == 'east')
+  {
+    start_corner.x = start_square.x - dimension.length;
+    start_corner.y = start_square.y - start_offset;
+    end_corner.x = start_corner.x + dimension.length;
+    end_corner.y = start_corner.y + dimension.width;
+  }
+  start_end_corner.start_corner = start_corner;
+  start_end_corner.end_corner = end_corner;
+  return start_end_corner;
+};
+
+wiz.random_dungeon.gygax_table_V_C = function(room_area)
+{
+  var dice = wiz.random_dungeon.get_random(1, 20);
+  var number_of_exits = 0;
+
+  if( (dice >= 1) && (dice <= 3) )
+  {
+    if(room_area <= 600)
+    {
+      number_of_exits = 1;
+    }
+    if(room_area > 600)
+    {
+      number_of_exits = 2;
+    }
+  }
+  if( (dice >= 4) && (dice <= 6) )
+  {
+    if(room_area <= 600)
+    {
+      number_of_exits = 2;
+    }
+    if(room_area > 600)
+    {
+      number_of_exits = 3;
+    }
+  }
+  if( (dice >= 7) && (dice <= 9) )
+  {
+    if(room_area <= 600)
+    {
+      number_of_exits = 3;
+    }
+    if(room_area > 600)
+    {
+      number_of_exits = 4;
+    }
+  }
+  if( (dice >= 10) && (dice <= 12) )
+  {
+    if(room_area <= 1200)
+    {
+      number_of_exits = 0;
+    }
+    if(room_area > 1200)
+    {
+      number_of_exits = 1;
+    }
+  }
+  if( (dice >= 13) && (dice <= 15) )
+  {
+    if(room_area <= 1600)
+    {
+      number_of_exits = 0;
+    }
+    if(room_area > 1600)
+    {
+      number_of_exits = 1;
+    }
+  }
+  if( (dice >= 16) && (dice <= 18) )
+  {
+    number_of_exits = wiz.random_dungeon.get_random(1, 4);
+  }
+  if( (dice >= 19) && (dice <= 20) )
+  {
+    number_of_exits = 1;
+  }
+  //for now return 1 if 0
+  if(number_of_exits == 0)
+  {
+    number_of_exits = 1;
+  }
+  return number_of_exits;
+};
+
+wiz.random_dungeon.gygax_table_V_D = function()
+{
+  var location_face = '';
+  var dice= wiz.random_dungeon.get_random(1, 20);
+  if( (dice>= 1) && (dice<= 7) )
+  {
+    location_face = 'opposite';
+  }
+  if( (dice>= 8) && (dice<= 12) )
+  {
+    location_face = 'left';
+  }
+  if( (dice>= 13) && (dice<= 17) )
+  {
+    location_face = 'right';
+  }
+  if( (dice>= 18) && (dice<= 20) )
+  {
+    location_face = 'same';
+  }
+  return location_face;
+};
+
+wiz.random_dungeon.check_existing_space_for_cursor = function(cursor_new, master_map)
+{
+  /*
+    cursor_new = {
+      'x' : 24,
+      'y' : 20,
+      'backward' : 'west',
+      'facing' : 'east',
+      'type' : 'room'
+    };
+  */
+  var x = cursor_new.x;
+  var y = cursor_new.y;
+
+  if( (x < 1) || (x > wiz.random_dungeon.CONFIG_MAX_WIDTH) )
+  {
+    return false;
+  }
+  else if( (y < 1) || (y > wiz.random_dungeon.CONFIG_MAX_HEIGHT) )
+  {
+    return false;
+  }
+  else if(master_map[x][y].clear_stack.all == 1)
+  {
+    return true;
+  }
+  return false;
+};
+
+wiz.random_dungeon.open_passageway_back_through_cursor_current = function(cursor_current, master_map)
+{
+  /*
+    cursor_current = {
+      'x' : 24,
+      'y' : 20,
+      'backward' : 'west',
+      'facing' : 'east',
+      'type' : 'room'
+    };
+  */
+  var x_current = cursor_current.x;
+  var y_current = cursor_current.y;
+  var x_before = 0;
+  var y_before = 0;
+
+  if( (cursor_current.backward == 'north') )
+  {
+    x_before = x_current;
+    y_before = y_current + 1;
+    master_map[x_current][y_current].wall_stack.top = 0;
+    master_map[x_before][y_before].wall_stack.bottom = 0;
+  }
+  if( (cursor_current.backward == 'west') )
+  {
+    x_before = x_current - 1;
+    y_before = y_current;
+    master_map[x_current][y_current].wall_stack.left = 0;
+    master_map[x_before][y_before].wall_stack.right = 0;
+  }
+  if( (cursor_current.backward == 'south') )
+  {
+    x_before = x_current;
+    y_before = y_current - 1;
+    master_map[x_current][y_current].wall_stack.bottom = 0;
+    master_map[x_before][y_before].wall_stack.top = 0;
+  }
+  if( (cursor_current.backward == 'east') )
+  {
+    x_before = x_current + 1;
+    y_before = y_current;
+    master_map[x_current][y_current].wall_stack.right = 0;
+    master_map[x_before][y_before].wall_stack.left = 0;
+  }
+  return master_map;
+};
+
+/*
+  Ancient tradition has x for horizontal and y for vertical
+  Tables are built from top down then left to right so
+  x and y are switched in this display routine
+*/
+wiz.random_dungeon.draw_table = function(master_map)
+{
+  var elem_table = document.createElement('table');
+  var elem_tr = document.createElement('tr');
+  var elem_td = document.createElement('td');
+  var y = 0;
+  var x = 0;
+  elem_table.style.background = '#000000';
+  elem_table.cellPadding = '0';
+  elem_table.cellSpacing = '0';
+  elem_table.style.border = '1px solid #000000';
+  elem_table.style.fontSize = '10px';
+  elem_table.style.margin = '0 auto';
+  for(y = wiz.random_dungeon.CONFIG_MAX_HEIGHT; y >= 1; y--)
+  {
+    elem_tr = document.createElement('tr');
+    for(x = 1; x <= wiz.random_dungeon.CONFIG_MAX_WIDTH; x++)
+    {
+      elem_td = document.createElement('td');
+      if(master_map[x][y].clear_stack.all == 0)
+      {
+        //draw black box
+        //elem_td.innerHTML = 'X';
+        //elem_td.innerHTML = '<nobr>'+x+'-'+y+'</nobr>';
+        //elem_td.innerHTML = master_map[x][y].label;
+        elem_td.innerHTML = '&nbsp;';
+        elem_td.style.height = '18px';
+        elem_td.style.width = '18px';
+        elem_td.style.background = '#000000';
+        elem_td.style.border = '1px solid #000000';
+      }
+      else
+      {
+        //draw white box
+        //elem_td.innerHTML = '&nbsp;';
+        //elem_td.innerHTML = '<nobr>'+x+'-'+y+'</nobr>';
+        elem_td.style.background = '#FFFFFF';
+        elem_td.innerHTML = master_map[x][y].label;
+        elem_td.style.height = '18px';
+        elem_td.style.width = '18px';
+        elem_td.style.borderTop = '1px solid #FFFFFF';
+        elem_td.style.borderRight = '1px solid #FFFFFF';
+        elem_td.style.borderBottom = '1px solid #FFFFFF';
+        elem_td.style.borderLeft = '1px solid #FFFFFF';
+        if(master_map[x][y].wall_stack.top == 1)
+        {
+          elem_td.style.borderTop = '1px solid #000000';
+        }
+        if(master_map[x][y].wall_stack.right == 1)
+        {
+          elem_td.style.borderRight = '1px solid #000000';
+        }
+        if(master_map[x][y].wall_stack.bottom == 1)
+        {
+          elem_td.style.borderBottom = '1px solid #000000';
+        }
+        if(master_map[x][y].wall_stack.left == 1)
+        {
+          elem_td.style.borderLeft = '1px solid #000000';
+        }
+      }
+      elem_tr.appendChild(elem_td);
+    }
+    elem_table.appendChild(elem_tr);
+  }
+  document.body.appendChild(elem_table);
+};
+
+wiz.random_dungeon.draw_table_debug = function(master_map)
+{
+  var elem_table = document.createElement('table');
+  var elem_tr = document.createElement('tr');
+  var elem_td = document.createElement('td');
+  var y = 0;
+  var x = 0;
+  for(y = wiz.random_dungeon.CONFIG_MAX_HEIGHT; y >= 1; y--)
+  {
+    elem_tr = document.createElement('tr');
+    for(x = 1; x <= wiz.random_dungeon.CONFIG_MAX_WIDTH; x++)
+    {
+      elem_td = document.createElement('td');
+      if(master_map[x][y].clear_stack.all == 0)
+      {
+        //draw black box
+        //elem_td.innerHTML = 'X';
+        elem_td.innerHTML = '<nobr>'+x+'-'+y+'</nobr>';
+        //elem_td.innerHTML = master_map[x][y].label;
+      }
+      else
+      {
+        //draw white box
+        //elem_td.innerHTML = '&nbsp;';
+        //elem_td.innerHTML = '<nobr>'+x+'-'+y+'</nobr>';
+        elem_td.innerHTML = master_map[x][y].label;
+        if(master_map[x][y].wall_stack.top == 1)
+        {
+          //draw top line
+          elem_td.style.borderTop = '1px solid #0000FF';
+        }
+        if(master_map[x][y].wall_stack.right == 1)
+        {
+          //draw right line
+          elem_td.style.borderRight = '1px solid #0000FF';
+        }
+        if(master_map[x][y].wall_stack.bottom == 1)
+        {
+          //draw bottom line
+          elem_td.style.borderBottom = '1px solid #0000FF';
+        }
+        if(master_map[x][y].wall_stack.left == 1)
+        {
+          //draw left line
+          elem_td.style.borderLeft = '1px solid #0000FF';
+        }
+      }
+      elem_tr.appendChild(elem_td);
+    }
+    elem_table.appendChild(elem_tr);
+  }
+  document.body.appendChild(elem_table);
+};
+
+</script>
+<script>
+window.onload = wiz.random_dungeon.generator;
+</script>
+</head>
+<body>
+<!-- javascript will append the dungeon as a table here -->
+</body>
+</html>
