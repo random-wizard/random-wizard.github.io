@@ -1,0 +1,1469 @@
+<html>
+<head>
+<title></title>
+<meta charset="utf8">
+</head>
+<body>
+<script>
+if(typeof wiz === 'undefined')
+{
+  var wiz = {};
+}
+/*
+  generator
+    get_linestack_by_linebreak
+    get_wordstack_by_space
+    determine_text_style
+      get_cvpiecebucket
+      scramble_cvpiecebucket
+
+      get_syllablebucket
+      scramble_syllablebucket
+*/
+wiz.random_name = {};
+
+wiz.random_name.generator = function(textdata, number_of_names)
+{
+  //var textlinestack = [];
+  //var allwordstack = [];
+  //var textstyle = '';
+  //var cvpiecebucket = {};
+  //var syllablebucket = [];
+  var namestack = [];
+
+  var textlinestack = wiz.random_name.get_linestack_by_linebreak(textdata);
+  var allwordstack = wiz.random_name.get_wordstack_by_space(textlinestack);
+  var textstyle = wiz.random_name.determine_text_style(allwordstack);
+  if(textstyle == 'atomic')
+  {
+    var cvpiecebucket = wiz.random_name.get_cvpiecebucket(allwordstack);
+    namestack = wiz.random_name.scramble_cvpiecebucket(cvpiecebucket, number_of_names);
+  }
+  else if(textstyle == 'syllable')
+  {
+    var syllablebucket = wiz.random_name.get_syllablebucket(allwordstack);
+    namestack = wiz.random_name.scramble_syllablebucket(syllablebucket, number_of_names);
+  }
+  return namestack;
+};
+
+//alias text_parse to generator for backwards compatibility
+wiz.random_name.text_parse = wiz.random_name.generator;
+
+/*
+Check to see if the first word of the first line begins with a
+bracket. If it does it is a syllable based data file. Otherwise we assume
+we are dealing with an generic word list.
+*/
+wiz.random_name.determine_text_style = function(allwordstack)
+{
+  var firstword = allwordstack[0];
+  firstword = firstword.split('');
+  if(firstword[0] == '[')
+  {
+    return 'syllable';
+  }
+  else
+  {
+    return 'atomic';
+  }
+};
+
+/*
+Break things down into words that start with vowels and words
+that start with consonants, i futzed the piecebucket to have to master
+object with the "vowel" and "consonant" key
+*/
+wiz.random_name.scramble_cvpiecebucket = function(piecebucket, number_of_names)
+{
+  //var leftyvowelstack = [];
+  //var leftyconsonantstack = [];
+  //var startvowelcount = 0;
+  //var startconsonantcount = 0;
+  //var totalcount = 0;
+
+  var leftyvowelstack = wiz.random_name.joinlefty(piecebucket.vowel);
+  var leftyconsonantstack = wiz.random_name.joinlefty(piecebucket.consonant);
+  var startvowelcount = leftyvowelstack.length;
+  var startconsonantcount = leftyconsonantstack.length;
+  var totalcount = startvowelcount + startconsonantcount;
+
+  //we need to rearrange our stacks so that they are arranged by the order
+  //they appear in the word so that we get a distribution of word pieces array
+  //this makes it handy for when we are building our new word
+
+  //var distconsonantstack = [];
+  //var distvowelstack = [];
+  //var maxpiececonsonant = 0;
+  //var maxpiecevowel = 0;
+
+  var distconsonantstack = wiz.random_name.finddistribution(leftyconsonantstack);
+  var distvowelstack = wiz.random_name.finddistribution(leftyvowelstack);
+  var maxpiececonsonant = distconsonantstack.length;
+  var maxpiecevowel = distvowelstack.length;
+
+  //time to utilize our vowel and consonant stacks and the information derived
+  //and push it into a new array to pass on to our display code as the end user
+  //will probably want to see the results
+  var pickcv = 0;
+  var diststack = 0;
+  var maxpiece = 0;
+  var nameit = '';
+  var namestack = [];
+  var namepiecelength = 0;
+  var y = 0;
+
+  for(y = 0; y <= 9; y++)
+  {
+    //we could get even more variety if we shifted the vowel and the consonant
+    //stack and we added those values to the others stack
+    //will work on that in the future
+    pickcv = Math.floor(Math.random()* (totalcount + 1));
+
+    if(pickcv > startconsonantcount)
+    {
+     diststack = distvowelstack;
+     maxpiece = maxpiecevowel;
+    }
+    else
+    {
+     diststack = distconsonantstack;
+     maxpiece = maxpiececonsonant;
+    }
+    nameit = "";
+
+    //this random selecting of the length should be tuned better
+    //we should find the distribution of word lengths and generate words
+    //with lengths that match the distribution of the original word list
+    //will work on this in the future
+    //namepiecelength = Math.floor(Math.random() * (maxpiece - 1)) + 1;
+    namepiecelength = Math.floor(Math.random() * (maxpiece - 2)) + 2;
+    for(var x = 0; x < namepiecelength; x++)
+    {
+      nameit = nameit + wiz.random_name.random_array_value(diststack[x]);
+    }
+    namestack[y] = nameit;
+  }
+  return namestack;
+};
+
+wiz.random_name.scramble_syllablebucket = function(syllablebucket, number_of_names)
+{
+  var namestack = [];
+  var x = 0;
+
+  for(x = 0; x < number_of_names; x++)
+  {
+    namestack.push(wiz.random_name.getnameit(syllablebucket));
+  }
+  return namestack;
+};
+
+wiz.random_name.getnameit = function(syllablebucket)
+{
+  var tempstack = Array();
+  var nameit = '';
+  var x = 0;
+  for(x = 1; x <= 4; x++)
+  {
+    tempstack = syllablebucket[x];
+    if(tempstack.length > 0)
+    {
+      nameit = nameit + wiz.random_name.random_array_value(tempstack);
+    }
+  }
+  nameit = wiz.random_name.capitalizefirstletter(nameit);
+  return nameit;
+};
+
+wiz.random_name.capitalizefirstletter = function(string)
+{
+  return string.charAt(0).toUpperCase() + string.slice(1);
+};
+
+/*
+This was originally written with the expectation that we would be dealing
+with lines of text with linebreaks. Internet Explorer, being the piece of
+shit that it is, does not keep linebreaks when you start throwing around
+innerHTML to populate textarea boxes. So this function is pointless.
+*/
+wiz.random_name.get_linestack_by_linebreak = function(textblob)
+{
+  //var textlinestack = [];
+  textblob = textblob.replace("\r\n", "\n");
+  textblob = textblob.replace("\r", "\n");
+
+  var textlinestack = textblob.split('\n');
+  //textlinestack = textblob.split('\r');
+  return textlinestack;
+};
+
+/*
+This function was written to fix an issue with ie jscript.
+ie jscript does not keep linebreaks when loading values or switching
+innerHTML so we load up all the words instead of just the first word
+so that ie  has something to play with since it sees the text as one
+giant single text line
+*/
+wiz.random_name.get_wordstack_by_space = function(arg)
+{
+  var allwordstack = [];
+
+  for(var x = 0; x < arg.length; x++)
+  {
+    var wordstack = arg[x].split(" ");
+    for(var y = 0; y < wordstack.length; y++)
+    {
+      //if(wordstack[y].length > 3)
+      //{
+      allwordstack[allwordstack.length] = wordstack[y];
+      //}
+    }
+  }
+  return allwordstack;
+};
+
+/*
+This function is huge. It takes in a stack of words and starts iterating
+over each letter in each word. It keeps track of the letter if it is a
+consonant or a vowel and when it detects a change, it slices and puts the
+piece into an array.
+*/
+wiz.random_name.get_cvpiecebucket = function(arg)
+{
+  //we need to differentiate between consonants and vowels and since there are
+  //less vowels in the latin alphabet we make a vowel array to check against
+  var vowel = "aeiouyáëíúâ";
+  vowel = vowel.split('');
+
+  //to get around ie jscript being a dork
+  var temp = "";
+  var templowercase = "";
+
+  var piecebucket = {};
+  piecebucket.consonant = [];
+  piecebucket.vowel = [];
+
+  var currentletterflag = '';
+  var piece = '';
+  var cutflag = '';
+  var piecestack = [];
+
+  for(var x = 0; x < arg.length; x++)
+  {
+    piece = "";
+    cutflag = "";
+    piecestack = [];
+
+    //why do i have to do this to get it to work with microsoft ie jscript?
+    //please note that there are two jscript issues being addressed here
+    //one is that jscript does not like arg[x][y] notation and the other is
+    //jscript doesn't seem to treat strings as though they were arrays unless
+    //you deliberately split it up with the split function
+    temp = arg[x];
+    templowercase = temp.toLowerCase();
+    temp = temp.split('');
+    templowercase = templowercase.split('');
+
+    for(var y = 0; y < templowercase.length; y++)
+    {
+      if(wiz.random_name.in_array(templowercase[y],vowel))
+      {
+        currentletterflag = "vowel";
+      }
+      else
+      {
+        currentletterflag = "consonant";
+      }
+
+      if(currentletterflag == cutflag)
+      {
+        piecestack[piecestack.length] = piece;
+        piece = "";
+        piece = piece + temp[y];
+      }
+      else
+      {
+        piece = piece + temp[y];
+      }
+
+      if(currentletterflag == "vowel")
+      {
+        cutflag = "consonant";
+      }
+      else if(currentletterflag == "consonant")
+      {
+        cutflag = "vowel";
+      }
+    }
+
+    if(piece.length)
+    {
+      piecestack[piecestack.length] = piece;
+      piece = "";
+    }
+
+    if(piecestack != "undefined")
+    {
+      if(piecestack.length)
+      {
+        //again, why do i have to do this for ie jscript
+        temp = piecestack[0];
+        templowercase = temp.toLowerCase();
+        templowercase = templowercase.split('');
+
+        if(wiz.random_name.in_array(templowercase[0], vowel))
+        {
+         piecebucket['vowel'][piecebucket['vowel'].length] = piecestack;
+        }
+        else
+        {
+         piecebucket['consonant'][piecebucket['consonant'].length] = piecestack;
+        }
+      }
+    }
+  }
+  return piecebucket;
+};
+
+wiz.random_name.joinlefty = function(arg)
+{
+
+ var leftystack = [];
+ var lefty = "";
+
+ for(var z = 0; z < arg.length; z++)
+ {
+  lefty = "";
+  leftystack[z] = [];
+
+  //my god, jscript sucks!
+  var temppiecestack = arg[z];
+  //temppiecestack = temppiecestack.split('');
+
+  for(var x = 0; x < temppiecestack.length; x++)
+  {
+   if( ((x +1) % 2) == 0)
+   {
+    lefty = lefty + temppiecestack[x];
+    leftystack[z][leftystack[z].length] = lefty;
+    lefty = "";
+   }
+   else
+   {
+    lefty = temppiecestack[x];
+   }
+  }
+
+  if(lefty.length)
+  {
+   leftystack[z][leftystack[z].length] = lefty;
+   lefty = "";
+  }
+ }
+ return leftystack;
+};
+
+wiz.random_name.finddistribution = function(arg)
+{
+  var diststack = [];
+  var tempdiststring = '';
+  var x = 0;
+
+  for(var z = 0; z < arg.length; z++)
+  {
+    tempdiststring = arg[z];
+
+    //tempdiststring = tempdiststring.split('');
+
+    for(x = 0; x < tempdiststring.length; x++)
+    {
+      if(typeof(diststack[x]) == "undefined")
+      {
+        diststack[x] = [];
+      }
+      diststack[x][diststack[x].length] = tempdiststring[x];
+    }
+  }
+  return diststack;
+};
+
+wiz.random_name.get_syllablebucket = function(wordstack)
+{
+  var sectionnumber = 1;
+  var syllablebucket = [];
+  syllablebucket[1] = [];
+  syllablebucket[2] = [];
+  syllablebucket[3] = [];
+  syllablebucket[4] = [];
+
+  for(var x = 0; x < wordstack.length; x++)
+  {
+    var temp = '';
+    temp = wordstack[x];
+    temp = temp.replace("\r", '');
+    temp = temp.replace("\n", '');
+    //temp = temp.toLowerCase();
+    //temp = temp.split('');
+
+    if(temp == '[first]')
+    {
+      sectionnumber = 1;
+    }
+    else if(temp == '[second]')
+    {
+      sectionnumber = 2;
+    }
+    else if(temp == '[third]')
+    {
+      sectionnumber = 3;
+    }
+    else if(temp == '[fourth]')
+    {
+      sectionnumber = 4;
+    }
+    else
+    {
+      syllablebucket[sectionnumber].push(temp);
+    }
+  }
+  return syllablebucket;
+};
+
+wiz.random_name.in_array = function(needle, haystack)
+{
+  for(var x = 0; x < haystack.length; x++)
+  {
+    if(haystack[x] === needle)
+    {
+      return true;
+    }
+  }
+  return false;
+};
+
+wiz.random_name.random_array_value = function(arg)
+{
+  var sizeit = arg.length;
+  var random_number = Math.floor(Math.random() * sizeit);
+
+  var valueit = arg[random_number];
+  return valueit;
+};
+
+</script>
+<script>
+function loadpremadelist(idname)
+{
+  vhtml = document.getElementById(idname).innerHTML;
+  document.getElementById("text_area1").value = vhtml;
+}
+
+function testparse(dividstring)
+{
+  var textdatadiv = document.getElementById(dividstring);
+  var textdata = textdatadiv.value;
+  namestack = wiz.random_name.generator(textdata, 10);
+  displaynamestack(namestack);
+}
+
+function displaynamestack(namestack)
+{
+  vhtml = "";
+  for(x = 0; x < namestack.length; x++)
+  {
+    //vhtml = vhtml + namestack[x] + "<br>\n";
+    vhtml = vhtml + namestack[x] +"\n";
+  }
+  document.getElementById('generatedname').innerHTML = vhtml;
+}
+</script>
+
+<div style="width: 280px;">
+Welcome to the text scrambler. It can be used to generate names. It works by slicing up any word list put into the first text box below. Feel free to edit the words in there or paste in your own list of words. Then click scramble and get variations through a process of chopping and splicing the words into new words.
+
+<form action="./" name="form1" id="form1">
+
+<textarea name="text_area1" id="text_area1" rows="10" cols="36">
+</textarea>
+<br>
+Click the Scramble button to get 10 new scrambled words.
+<br>
+<input type="button" onclick="testparse('text_area1')" value="Scramble">
+<br>
+<textarea name="generatedname" id="generatedname" rows="10" cols="36" style="border: 1px solid #BFC1B5;">
+</textarea>
+</form>
+</div>
+
+
+<textarea id="tolkien-elves" style="display: none; visibility: hidden;">Aegnor
+Alatáriel
+Altáriel
+Amarië
+Amdír
+Amras
+Amrod
+Amroth
+Angrod
+Annael
+Aranwë
+Aredhel Ar-Feiniel
+Arminas
+Artanis
+Arwen Evenstar
+Beleg Strongbow
+Caranthir
+Celeborn
+Celebrían
+Celebrimbor
+Celegorm
+Círdan
+Curufin
+Curufinwë
+Daeron
+Denethor
+Dior Eluchíl
+Eärendil
+Eärwen
+Ecthelion
+Edrahil
+Elemmakil
+Elemmírë
+Elenwë
+Elladan
+Elmo
+Elrohir
+Elrond
+Elu Thingol
+Eluréd
+Elurín
+Elwë Singollo
+Elwing
+Enerdhil
+Eöl
+Ereinion Gil-galad
+Erestor
+Faelivrin
+Fëanor
+Finarfin
+Finduilas
+Fingolfin
+Fingon
+Finrod Felagund
+Finwë
+Galadhon
+Galadhriel
+Galadriel
+Galathil
+Galdor
+Galion
+Gelmir
+Gelmir of Nargothrond
+Gildor Inglorion
+Gil-galad
+Glorfindel of Gondolin
+Glorfindel of Rivendell
+Guilin
+Gwindor
+Haldir
+Idril Celebrindal
+Indis
+Ingwë
+Ithilbor
+Legolas Greenleaf
+Lenwë
+Lindir
+Lómion
+Lúthien Tinúviel
+Mablung
+Maedhros
+Maeglin
+Maglor
+Mahtan
+Malgalad
+Míriel Serindë
+Mithrellas
+Nellas
+Nerdanel
+Nerwen
+Nimloth
+Nimrodel
+Nóm
+Olwë
+Orodreth
+Oropher
+Orophin
+Rúmil of Lórien
+Rúmil
+Saeros
+Teleporno
+Thingol
+Thranduil
+Turgon
+Voronwë
+</textarea>
+
+
+<textarea id="tolkien-dwarves" style="display: none; visibility: hidden;">Azaghâl
+Balin
+Bifur
+Bofur
+Bombur
+Borin
+Dáin
+Dáin Ironfoot
+Dís
+Dori
+Durin
+Dwalin
+Farin
+Fíli
+Flói
+Frár
+Frerin
+Frór
+Fundin
+Gamil Zirak
+Gimli
+Glóin
+Gróin
+Grór
+Ibun
+Khîm
+Kíli
+Lóni
+Mîm
+Náin
+Náli
+Nár
+Narvi
+Nori
+Óin
+Ori
+Telchar
+Thorin
+Thráin
+Thrór
+</textarea>
+
+<textarea id="tolkien-hobbits" style="display: none; visibility: hidden;">Adaldrida Bolger
+Adalgrim
+Adamanta Chubb
+Adelard
+Amaranth
+Andwise Roper
+Andy Roper
+Angelica
+Anson Roper
+Asphodel
+Angelica
+Balbo
+Belba
+Bilbo
+Bingo
+Bungo
+Dora
+Drogo
+Dudo
+Fosco
+Frodo
+Largo
+Lily
+Linda
+Longo
+Mungo
+Pansy
+Peony
+Polo
+Pontoson of Balbo
+Pontoson of Posco
+Porto
+Posco
+Prisca
+Rosa
+Balbo
+Banazîr
+Bandobras
+BanksEglantine
+Belba
+Bell Goodchild
+Belladonna
+Berylla Boffin
+Bilbo
+Bilbo Gardner
+Bingo
+Blanco
+Bob
+Bodo Proudfoot
+Berylla
+Folca
+Hugo
+Adaldrida
+Estella
+Fastolph
+Fatty
+Filibert
+Fredegar
+Gundabald
+Odovacar
+Ruby
+Rudigar
+Wilibald
+Bowman
+Hilda
+Hugo
+Lobelia
+BrandgambaKalimac
+Amaranth
+Asphodel
+Celandine
+Doderic
+Gorbadoc
+Gorhendad
+Gormadoc
+Ilberic
+Madoc
+Marmadas
+Marmadoc
+Marroc
+Melilot
+Mentha
+Meriadoc
+Merimac
+Merimas
+Merry
+Old Rory
+Orgulas
+Primula
+Rorimac
+Sadoc
+Salvia
+Saradas
+Saradoc
+Seredic
+BrownLily
+BrownlockGilly
+Bucca of the Marish
+BunceMimosa
+Bungo
+Milo
+Minto
+Mosco
+Moto
+Myrtle
+Rufus
+Camellia Sackville
+Carl
+Carl
+Celandine
+Chica Chubb
+Adamanta
+Chica
+Falco
+Poppy
+ClayhangerLalia
+Cotman
+Cottar
+Bowman
+Carl
+Holman
+Jolly
+Lily
+Nibs
+Nick
+Rose
+Tolman
+Tom
+Wilcome
+Daddy Twofoot
+Daisy
+Déagol
+Diamond of Long Cleeve
+Doderic
+Donnamira
+Dora
+Drogo
+Dudo
+Eglantine Banks
+Elanor Gardner
+Elfstan Fairbairn
+Esmeralda
+Estella Bolger
+Everard
+FairbairnElfstan
+Falco Chubb-
+Faramir I
+Fastolph Bolger
+Fastred of Greenholm
+Fatty Bolger
+Ferdinard
+Ferumbras II
+Ferumbras III
+Filibert Bolger
+Flambard
+Folco Boffin
+Fortinbras I
+Fortinbras II
+Fosco
+Fredegar Bolger
+Frodo
+Frodo Gardner
+Gaffer
+Daisy
+Gaffer
+Halfast
+Halfred
+Hamfast
+Hamson
+Marigold
+May
+Roper
+Sam
+Samwise
+GammidgeHob
+Gamwich
+Bilbo
+Elanor
+Frodo
+Goldilocks
+Hamfast
+Holfast
+Merry
+Pippin
+Primrose
+Robin
+Rose
+Ruby
+Tolman
+Gerontius
+Gilly Brownlock
+Goldilocks Gardner
+Goldworthy Hanna
+Gollum
+Goodbody Togo
+Goodchild Bell
+Gorbadoc
+Gorhendad Oldbuck
+Gormadoc
+Greenhand Halfred
+Greenhand Holman
+GrubbLaura
+Gundabald Bolger
+Halfast Hal
+Halfred
+Halfred Greenhand
+Hamfast Gaffer
+Hamfast Gardner
+Hamfast of Gamwich
+Hamson
+Hanna Goldworthy
+Harding
+Hayward Hob
+Headstrong Malva
+Hilda Bracegirdle
+Hildibrand
+Hildifons
+Hildigard
+Hildigrim
+Hob Gammidge
+Hob Hayward
+Hobson
+Holbytlan
+Holdwine
+Holfast Gardner
+Holman Greenhand
+Holman
+Old Toby
+Tanta
+Tobold
+Hugo Boffin
+Hugo Bracegirdle
+Ilberic
+Isembard
+Isengar
+Isengrim
+Isumbras
+Jolly
+Kalimac Brandagamba
+Lalia Clayhanger
+Largo
+Laura Grubb
+Lily
+Linda
+Lobelia Bracegirdle
+Lobelia
+Longo
+Lotho
+Madoc
+Maggot
+Malva Headstrong
+Marcho
+Marigold
+Marmadas
+Marmadoc
+Marroc
+May
+May
+Melilot
+Mentha
+Meriadoc
+Merimac
+Merimas
+Merry
+Merry Gardner
+Milo Burrows
+Mimosa Bunce
+Minto Burrows
+Mirabella
+Mosco Burrows
+Moto Burrows
+Mrs.
+Mungo
+Myrtle Burrows
+Nibs
+Nick
+Nob
+Odo Proudfoot
+Odovacar Bolger
+Old Rory
+Old Toby
+Oldbuck Gorhendad
+Olo Proudfoot
+Orgulas
+Otho
+Paladin
+Pansy
+Pearl
+Peony
+Peregrin
+Pervinca
+Pimpernel
+Pippin Gardner
+Polo
+Ponto
+Poppy Chubb
+Porto
+Posco
+Primrose Gardner
+Primula
+Prisca
+Bodo
+Odo
+Olo
+Sancho
+Ranugad
+Reginard
+Robin Gardner
+Robin Smallburrow
+Roper
+Andwise
+Andy
+Anson
+Rorimac Goldfather
+Rosa
+Rosamunda
+Rose
+Rose
+Rose Gardner
+Rowan
+Ruby Bolger
+Ruby Gardner
+Rudigar Bolger
+Rufus Burrows
+Rumble
+Sackville Camellia
+Lobelia
+Lotho
+Otho
+Sadoc
+Salvia
+Sam
+Samwise
+Sancho Proudfoot
+Sandyman
+SandymanTed
+Saradas
+Saradoc
+Seredic
+Sigismond
+Smallburrow Robin
+Sméagol
+Tanta Hornblower
+Ted Sandyman
+Tobold Hornblower
+Togo Goodbody
+Tolman
+Tolman Gardner
+Tom
+Adalgrim
+Adelard
+Bandobras
+Belladonna
+Donnamira
+Esmeralda
+Everard
+Faramir
+Ferdinard
+Ferumbras
+Flambard
+Fortinbras
+Gerontius
+Hildibrand
+Hildifons
+Hildigard
+Hildigrim
+Isembard
+Isengar
+Isengrim
+Isumbras
+Mirabella
+Paladin
+Pearl
+Peregrin
+Pervinca
+Pimpernel
+Pippin
+Reginard
+Rosamunda
+Sigismond
+Trahald
+Twofoot Daddy
+Whitfoot Will
+Rumble
+Wilcome
+Wilibald Bolger
+Will Whitfoot
+Gamwich
+</textarea>
+
+<textarea id="tolkien-men" style="display: none; visibility: hidden;">Adanedhel
+Adrahil Ondoher
+Adrahil Imrahil
+Adûnakhôr
+Aerandir
+Aerin
+Agarwaen
+Aghan
+Ailinel
+Alcarin
+Aldamir
+Aldarion
+Aldor
+Algund
+Almarian
+Almiel
+Amandil
+Amlach
+Amlaith of Fornost
+Anardil of Gondor
+Anardil of Númenor
+Anárion Elendil
+Anárion Ancalimë
+Anborn
+Ancalimë
+Andróg
+Angamaitë
+Angbor
+Appledore Rowlie
+Ar-Abattârik
+Arador
+Ar-Adûnakhôr
+Araglas
+Aragorn
+Aragorn Elessar
+Aragost
+Arahad
+Arahael
+Aranarth
+Arantar
+Aranuir
+Araphant
+Araphor
+Arassuil
+Aratan
+Arathorn
+Araval
+Aravir
+Aravorn
+Ar-Belzagar
+Argeleb
+Ar-Gimilzôr
+Argonui
+Ar-Inziladûn
+Ar-Pharazôn
+Ar-Sakalthôr
+Artamir
+Arvedui
+Arvegil
+Arveleg
+Arvernien
+Arwen Evenstar
+Ar-Zimraphel
+Ar-Zimrathôn
+Atanalcar
+Atanamir
+Atanatar
+Atanatar Alcarin
+Aulendil
+Axantur
+Bain
+Balan
+Baldor
+Barach
+Baragund
+Barahir Faramir
+Barahir son of Bregor
+Barahir son of Hador
+Baran
+Baranor
+Bard
+Barley
+Barliman Butterbur
+Belecthor
+Beleg of Arthedain
+Belegorn
+Belegund
+Bëor
+Beorn
+Bereg
+Beregar
+Beregond
+Beren Erchamion
+Beren of Gondor
+Bereth
+Bergil
+Berúthiel
+Bill Ferny
+Bór
+Borlach
+Borlad
+Boromir of Ladros
+Boromir
+Boron
+Borondir
+Borthand
+Brand
+Brandir
+Brego
+Bregolas
+Bregor
+Brethil
+Brodda
+Brytta Léofa
+Calimehtar King of Gondor
+Calimehtar son of Calmacil
+Caliondo
+Calmacil of Gondor
+Calmacil of Númenor
+Castamir
+Celebrindor
+Celepharn
+Cemendur
+Ceorl
+Cirion
+Ciryaher
+Ciryandil
+Ciryatur
+Ciryon
+Damrod
+Denethor
+Déor
+Déorwine
+Dernhelm
+Derufin
+Dervorin
+Dior
+Dírhael
+Dírhavel
+Dorlas
+Duilin
+Duinhir
+Dúnhere
+Eärendil
+Eärendur King of Arnor
+Eärendur Lord of Andúnië
+Eärendur son of Tar-Amandil
+Eärnil
+Eärnur
+Ecthelion
+Egalmoth
+Eilinel
+Elatan
+Eldacar of Arnor
+Eldacar of Gondor
+Eldarion
+Elendil
+Elendur King of Arnor
+Elendur son of Isildur
+Elfhelm
+Elfhild
+Elfwine
+Elros
+Emeldir
+Éomer Éadig
+Éomund of Eastfold
+Eorl
+Éothain
+Éowyn
+Eradan
+Erellont
+Erendis
+Erkenbrand
+Estel
+Estelmo
+Falathar
+Faramir son of Denethor
+Faramir son of Ondoher
+Fastred
+Fengel
+Ferny Bill
+Findegil
+Finduilas
+Fíriel
+Folca
+Folcred
+Folcwine
+Forlong
+Forweg
+Fram
+Fréa
+Fréaláf Hildeson
+Fréawine
+Freca
+Frumgar
+Fuinur
+Galador
+Galdor
+Gálmód
+Gamling
+Gethron
+Ghân
+Ghân-buri-Ghân
+Gildor
+Gilraen
+Gimilkhâd
+Gimilzagar
+Girion
+Glóredhel
+Goatleaf, Harry
+Golasgil
+Goldwine
+Gorlim the Unhappy
+Gram
+Gríma Wormtongue
+Grimbeorn the Old
+Grimbold of Westfold
+Grithnir
+Gundor
+Guthláf
+Hador Steward of Gondor
+Hador
+Halbarad
+Haldad
+Haldan
+Haldar
+Haldir
+Haleth daughter of Haldad
+Haleth son of Helm
+Hallacar
+Hallas
+Hallatan
+Halmir
+Háma of Théoden
+Háma son of Helm
+Handir
+Harding
+Hareth
+Harry Goatleaf
+Hathaldir
+Hathol
+Hatholdir
+Heathertoes Mat
+Helm Hammerhand
+Henderch
+Herefara
+Herion
+Herubrand
+Herucalmo
+Herumor
+Hild
+Hirgon
+Hirluin
+Hope
+Horn
+Hunthor
+Huor
+Húrin
+Húrin of Emyn Arnen
+Húrin of the First Age
+Húrin the Tall
+Hyarmendacil
+Îbal
+Imlach
+Imrahil
+Imrazôr
+Ingold
+Inziladûn
+Inzilbêth
+Ioreth
+Iorlas
+Írimon
+Isildur
+Isilmë
+Isilmo
+Ivorwen
+Khamûl
+Labadal
+Lalaith
+Larnach
+Léod
+Léofa
+Lindórië
+Lorgan
+Lothíriel
+Mablung
+Magor
+Mairen
+Malach Aradan
+Malantur
+Malbeth
+Mallor
+Malvegil
+Mámandil
+Manwendil
+Marach
+Mardil Voronwë
+Marhari
+Marhwini
+Mat Heathertoes
+Meneldil
+Meneldur
+Minalcar
+Minardil
+Minastan
+Minastir
+Minohtar
+Míriel
+Morwen
+Morwen of Lossarnach
+Morwen Steelsheen
+Narmacil
+Nienor Níniel
+Níniel
+Nolondil
+Númendil
+Núneth
+Ondoher
+Orchaldor
+Orleg
+Ornendil
+Orodreth
+Oromendil
+Ostoher
+Pelendur
+Pharazôn
+Radhruin
+Ragnor
+Rían
+Rómendacil
+Rowlie Appledore
+Sador
+Sangahyando
+Silmariën
+Siriondil
+Soronto
+Strider
+Súrion
+Tar-Alcarin
+Tar-Aldarion
+Tar-Amandil
+Tar-Anárion
+Tar-Ancalimë
+Tar-Ancalimon
+Tar-Anducal
+Tarannon Falastur
+Tar-Ardamin
+Tar-Atanamir the Great
+Tar-Calion
+Tar-Calmacil
+Tarcil
+Tarciryan
+Tar-Ciryatan
+Tar-Elendil
+Tar-Falassion
+Tar-Herunúmen
+Tar-Hostamir
+Tar-Meneldur
+Tar-Minastir
+Tar-Minyatur
+Tar-Míriel
+Tarondor of Arnor
+Tarondor of Gondor
+Tarostar
+Tar-Palantir
+Tar-Súrion
+Tar-Telemmaitë
+Tar-Telemnar
+Tar-Telperiën
+Tar-Vanimeldë
+Telemnar
+Telumehtar Umbardacil
+Thengel
+Théoden
+Théodred
+Théodwyn
+Thorondir
+Thorongil
+Tim
+Tindómiel
+Tuor
+Turambar King of Gondor
+Turgon
+Túrin
+Túrin son of Húrin
+Ulbar
+Uldor the Accursed
+Ulfang the Black
+Ulfast
+Ulrad
+Ulwarth
+Úmarth
+Úner
+Urwen
+Valacar
+Valandil of Arnor
+Valandil of Númenor
+Valandur
+Vardamir
+Vardilmë
+Vardilyë
+Vëantur
+Vidugavia
+Vidumavi
+Vinitharya
+Vinyarion
+Vorondil
+Walda
+Wídfara
+Wingfoot
+Wulf
+Yávië
+Yávien
+Zamîn
+</textarea>
+
+<div id="english-simple" style="visibility: hidden; display: none;">
+John Doe
+Jane Smith
+William Tell
+Robin Hood
+Type More Names In Here
+</div>
+
+<script type="text/javascript">
+loadpremadelist('tolkien-elves');
+</script>
+
+</body>
+</html>
